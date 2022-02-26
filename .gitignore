@@ -13,3 +13,8 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+.idea
+.code
+
+# Main file (it's a package so there should not be main)
+main.go

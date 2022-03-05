@@ -24,7 +24,7 @@ type Response struct {
 
 	// ID is required, it must be the same value as the id in the Request
 	// Object.
-	ID interface{} `json:"id"`
+	ID RequestID `json:"id"`
 }
 
 // NewResponse create a new Response structure

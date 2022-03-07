@@ -157,3 +157,72 @@ func TestParseRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestParseMethod(t *testing.T) {
+	testCases := []struct {
+		name           string
+		method         string
+		success        bool
+		expectedResult *procedure
+		expectedError  *RpcError
+	}{
+		{
+			name:           "Invalid method : 2 underscore",
+			method:         "foo_bar_baz",
+			success:        false,
+			expectedResult: nil,
+			expectedError:  InvalidRequestError(ErrInvalidMethodFormat.Error()),
+		},
+		{
+			name:           "Valid method : no underscore",
+			method:         "foo",
+			success:        true,
+			expectedResult: &procedure{Service: "", Method: "Foo"},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid method : no underscore and already PascalCase",
+			method:         "Foo",
+			success:        true,
+			expectedResult: &procedure{Service: "", Method: "Foo"},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid method : underscore",
+			method:         "eth_getBalance",
+			success:        true,
+			expectedResult: &procedure{Service: "eth", Method: "GetBalance"},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid method : underscore with already PascalCase",
+			method:         "eth_GetBalance",
+			success:        true,
+			expectedResult: &procedure{Service: "eth", Method: "GetBalance"},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid method : underscore with empty method",
+			method:         "eth_",
+			success:        true,
+			expectedResult: &procedure{Service: "eth", Method: ""},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid method : underscore with empty method",
+			method:         "_getBalance",
+			success:        true,
+			expectedResult: &procedure{Service: "", Method: "GetBalance"},
+			expectedError:  nil,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := parseMethod(tt.method)
+
+			assert.Equal(t, tt.expectedResult, res)
+			assert.Equal(t, tt.expectedError, err)
+		})
+	}
+}

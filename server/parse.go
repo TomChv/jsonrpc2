@@ -55,11 +55,12 @@ func parseRequest(r *http.Request) (*Request, *RpcError) {
 			break
 		case "float64":
 			// Verify if it's an integer or a float
+			// nolint:forcetypeassert
 			if req.ID != float64(int(req.ID.(float64))) {
 				return nil, InvalidRequestError(ErrInvalidIdentifierType.Error())
 			}
+			// nolint:forcetypeassert
 			req.SetID(int(req.ID.(float64)))
-			break
 		default:
 			return nil, InvalidRequestError(ErrInvalidIdentifierType.Error())
 		}

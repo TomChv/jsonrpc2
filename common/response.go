@@ -12,7 +12,7 @@ type ResponseResult = interface{}
 // Response is a JSON-RPC 2.0 Object that represent a response from the server
 type Response struct {
 	// JsonRPC is the version of JSON-RPC protocol, must be "2.0"
-	JsonRpc string `json:"jsonrpc,required"`
+	JsonRpc string `json:"jsonrpc" binding:"register"`
 
 	// Result is required on success, this member must not exist if there was
 	// an error invoking the method
@@ -53,6 +53,7 @@ func (r *Response) SetError(err *RpcError) *Response {
 // NOTE: SetResult should not be call if RpcError is set
 func (r *Response) SetResult(result ResponseResult) *Response {
 	r.Result = result
+
 	return r
 }
 

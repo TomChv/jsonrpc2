@@ -103,7 +103,6 @@ func TestJsonRPC2_ServeHTTP(t *testing.T) {
 }
 
 func TestJsonRPC2_Run(t *testing.T) {
-	t.Skip("don't know how to test it for now")
 	//	ctx, cancel := context.WithCancel(context.TODO())
 	//
 	//	s := New(ctx)
@@ -114,4 +113,5 @@ func TestJsonRPC2_Run(t *testing.T) {
 	//		}
 	//	}()
 	//	cancel()
+	t.Skip("don't know how to test it for now")
 }

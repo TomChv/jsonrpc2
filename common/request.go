@@ -7,10 +7,10 @@ type RequestParam = interface{}
 // Request is a JSON-RPC 2.0 Object that represent a call to the server
 type Request struct {
 	// JsonRPC is the version of JSON-RPC protocol, must be "2.0"
-	JsonRpc string `json:"jsonrpc,required"`
+	JsonRpc string `json:"jsonrpc" binding:"register"`
 
 	// Method containing the name of the method to be invoked.
-	Method string `json:"method,required"`
+	Method string `json:"method" binding:"register"`
 
 	// Params is a Structured value that holds the parameter values to be used
 	// during the invocation of the method.
@@ -30,6 +30,7 @@ func NewRequest() *Request {
 
 func (r *Request) SetID(id RequestID) *Request {
 	r.ID = id
+
 	return r
 }
 

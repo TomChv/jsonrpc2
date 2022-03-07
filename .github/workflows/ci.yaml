@@ -1,0 +1,71 @@
+name: Continuous Integration
+
+on:
+  push:
+    paths-ignore:
+      - .gitignore
+      - README.md
+    branches:
+      - main
+  pull_request:
+    paths-ignore:
+      - .gitignore
+      - README.md
+    branches:
+      - main
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Unit test
+        run: go test -v ./...
+
+  lint:
+    name: Linter
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Setup Golang
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          skip-go-installation: true
+          args:
+            --timeout=3m
+            -E whitespace
+            -E wastedassign
+            -E unconvert
+            -E tparallel
+            -E thelper
+            -E prealloc
+            -E predeclared
+            -E nolintlint
+            -E misspell
+            -E makezero
+            -E importas
+            -E ifshort
+            -E gosec
+            -E gofmt
+            -E goconst
+            -E forcetypeassert
+            -E dogsled
+            -E dupl
+            -E errname
+            -E errorlint

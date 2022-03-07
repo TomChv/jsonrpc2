@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
@@ -47,19 +49,35 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Parse request
 	req, err := parseRequest(r)
 	if err != nil {
-		common.NewResponse(nil).SetError(err).Send(w)
+		_ = common.NewResponse(nil).SetError(err).Send(w)
 		return
 	}
 
-	common.NewResponse(req.ID).SetResult(req).Send(w)
+	_ = common.NewResponse(req.ID).SetResult(req).Send(w)
 	// Use dispatcher
 
 	// Send response
-
 }
 
 // Run start JSON RPC 2.0 server
-func (s *JsonRPC2) Run(addr string) error {
-	panic("implement me")
+func (s *JsonRPC2) Run(port string) error {
+	addr := fmt.Sprintf(":%s", port)
+
+	ctx, cancel := context.WithCancel(s.ctx)
+	go func() {
+		err := http.ListenAndServe(addr, s)
+		if err != nil {
+			cancel()
+		}
+	}()
+
+	log.Println(fmt.Sprintf("JSON RPC 2.0 server listening on http://0.0.0.0:%s", addr))
+
+	select {
+	case <-s.ctx.Done():
+		cancel()
+	case <-ctx.Done():
+		return nil
+	}
 	return nil
 }

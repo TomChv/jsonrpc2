@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -53,10 +54,49 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = common.NewResponse(req.ID).SetResult(req).Send(w)
 	// Use dispatcher
+	p, err := parseMethod(req.Method)
+	if err != nil {
+		_ = common.NewResponse(req.ID).SetError(err).Send(w)
+		return
+	}
+
+	// Run procedure
+	ret, errCall := s.d.Run(p.Service, p.Method, req.Params)
+	if errCall != nil {
+		res := common.NewResponse(req.ID)
+
+		switch {
+		case errors.Is(errCall, dispatcher.ErrNonExistentMethod) ||
+			errors.Is(errCall, dispatcher.ErrNonExistentService):
+			res.SetError(MethodNotFoundError(errCall.Error()))
+		case errors.Is(errCall, dispatcher.ErrInvalidArgumentType) ||
+			errors.Is(errCall, dispatcher.ErrInvalidArgumentsCount):
+			res.SetError(InvalidParamsError(errCall.Error()))
+		default:
+			res.SetError(InternalError(errCall.Error()))
+		}
+
+		_ = res.Send(w)
+		return
+	}
+
+	// Retrieve response
+	res := ret[0].Interface()
+
+	// Retrieve error
+	errCall, ok := ret[1].Interface().(error)
+	if !ok {
+		_ = common.NewResponse(req.ID).SetError(InternalError("could not retrieve function error")).Send(w)
+		return
+	}
+
+	if errCall != nil {
+		_ = common.NewResponse(req.ID).SetError(InternalError(errCall))
+	}
 
 	// Send response
+	_ = common.NewResponse(req.ID).SetResult(res).Send(w)
 }
 
 // Run start JSON RPC 2.0 server

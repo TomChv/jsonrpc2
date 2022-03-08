@@ -10,17 +10,13 @@ var (
 )
 
 // validateService ensure that each public methods of the service is compliant
-// with the JSON RPC 2.0 response type : (Response, RpcError).
+// with the type : (interface{}, error).
 //
 // It uses reflect to loop though each public methods of the service
 // Then it verifies that method has the same return type than expected.
 //
 // If service is compliant, validateService return true, else false.
 func validateService(service interface{}) bool {
-	expectedSignatureTypes := []reflect.Type{
-		reflect.TypeOf(&Response{}),
-		reflect.TypeOf(&RpcError{}),
-	}
 	st := reflect.TypeOf(service)
 
 	for i := 0; i < st.NumMethod(); i++ {
@@ -32,10 +28,8 @@ func validateService(service interface{}) bool {
 			return false
 		}
 
-		for j := 0; j < st.Method(i).Func.Type().NumOut(); j++ {
-			if !st.Method(i).Func.Type().Out(j).AssignableTo(expectedSignatureTypes[j]) {
-				return false
-			}
+		if !st.Method(i).Func.Type().Out(1).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			return false
 		}
 	}
 	return true

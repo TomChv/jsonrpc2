@@ -19,31 +19,28 @@ func (ms *mockInvalidService) MethodInvalidNoReturnType() {}
 
 type mockInvalidService2 struct{}
 
-func (ms *mockInvalidService2) MethodInvalidIncompleteReturnType() *Response {
+func (ms *mockInvalidService2) MethodInvalidIncompleteReturnType() interface{} {
 	return nil
 }
 
 type mockService struct{}
 
-func (ms mockService) MethodEmptyArgs() (*Response, *RpcError) {
+func (ms mockService) MethodEmptyArgs() (interface{}, error) {
 	return nil, nil
 }
 
-func (ms mockService) MethodWithArg(str string) (*Response, *RpcError) {
-	return common.NewResponse("0").SetResult(str), nil
+func (ms mockService) MethodWithArg(str string) (string, error) {
+	return str, nil
 }
 
-func (ms mockService) MethodWithArgs(str string, num int64) (*Response, *RpcError) {
-	return common.NewResponse("0").SetResult(struct {
-		Str string
-		Num int64
-	}{
-		Str: str,
-		Num: num,
-	}), nil
+func (ms mockService) MethodWithArgs(str string, num int64) (map[string]interface{}, *RpcError) {
+	return map[string]interface{}{
+		"str": str,
+		"num": num,
+	}, nil
 }
 
-func (ms mockService) MethodWithComplexArgs(str []string, num int64, b bool, obj interface{}) (*Response, *RpcError) {
+func (ms mockService) MethodWithComplexArgs(str []string, num int64, b bool, obj interface{}) (*Response, error) {
 	return common.NewResponse("0").SetResult(struct {
 		Str    []string
 		Num    int64

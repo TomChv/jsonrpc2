@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/TomChv/jsonrpc2/common"
@@ -220,6 +221,131 @@ func TestParseMethod(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			res, err := parseMethod(tt.method)
+
+			assert.Equal(t, tt.expectedResult, res)
+			assert.Equal(t, tt.expectedError, err)
+		})
+	}
+}
+
+func TestParseParams(t *testing.T) {
+	testCases := []struct {
+		name           string
+		success        bool
+		args           []reflect.Type
+		params         interface{}
+		expectedResult []interface{}
+		expectedError  *RpcError
+	}{
+		{
+			name:           "Valid : no arguments",
+			success:        true,
+			args:           []reflect.Type{},
+			params:         nil,
+			expectedResult: []interface{}{},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse one arg : string",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf("")},
+			params:         "foo",
+			expectedResult: []interface{}{"foo"},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse one arg : int",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(4)},
+			params:         4,
+			expectedResult: []interface{}{4},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse one arg : boolean",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(true)},
+			params:         false,
+			expectedResult: []interface{}{false},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse one arg : float",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(float64(2))},
+			params:         float64(2),
+			expectedResult: []interface{}{float64(2)},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse one arg : object",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(struct{ Foo string }{Foo: ""})},
+			params:         struct{ Foo string }{Foo: "foo"},
+			expectedResult: []interface{}{struct{ Foo string }{Foo: "foo"}},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse one arg : array",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf([]int{0})},
+			params:         []int{1, 2, 3},
+			expectedResult: []interface{}{[]int{1, 2, 3}},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse multi arg : int",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(0), reflect.TypeOf(0)},
+			params:         []int{1, 2},
+			expectedResult: []interface{}{1, 2},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse multi arg : string",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(""), reflect.TypeOf("")},
+			params:         []string{"foo", "bar"},
+			expectedResult: []interface{}{"foo", "bar"},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse multi arg : boolean",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(false)},
+			params:         []bool{false, true},
+			expectedResult: []interface{}{false, true},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse multi arg : mix primitive type",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf(0)},
+			params:         []interface{}{true, "foo", 5},
+			expectedResult: []interface{}{true, "foo", 5},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse multi arg : mix primitive type with array",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf([]int{0})},
+			params:         []interface{}{true, "foo", []int{1, 2, 3}},
+			expectedResult: []interface{}{true, "foo", []int{1, 2, 3}},
+			expectedError:  nil,
+		},
+		{
+			name:           "Valid : parse multi arg : mix primitive type with array and object",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf([]int{0}), reflect.TypeOf(struct{ Foo string }{Foo: ""})},
+			params:         []interface{}{true, "foo", []int{1, 2, 3}, struct{ Foo string }{Foo: "foo"}},
+			expectedResult: []interface{}{true, "foo", []int{1, 2, 3}, struct{ Foo string }{Foo: "foo"}},
+			expectedError:  nil,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := parseParams(tt.args, tt.params)
 
 			assert.Equal(t, tt.expectedResult, res)
 			assert.Equal(t, tt.expectedError, err)

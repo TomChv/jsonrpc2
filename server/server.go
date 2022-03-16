@@ -48,21 +48,33 @@ func (s *JsonRPC2) Register(namespace string, service interface{}) error {
 // Implement HTTP interface to listen and response to incoming HTTP request
 func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Parse request
-	req, err := parseRequest(r)
-	if err != nil {
-		_ = common.NewResponse(nil).SetError(err).Send(w)
+	req, rpcErr := parseRequest(r)
+	if rpcErr != nil {
+		_ = common.NewResponse(nil).SetError(rpcErr).Send(w)
 		return
 	}
 
 	// Use dispatcher
-	p, err := parseMethod(req.Method)
+	p, rpcErr := parseMethod(req.Method)
+	if rpcErr != nil {
+		_ = common.NewResponse(req.ID).SetError(rpcErr).Send(w)
+		return
+	}
+
+	m, err := s.d.GetMethod(p.Service, p.Method)
 	if err != nil {
-		_ = common.NewResponse(req.ID).SetError(err).Send(w)
+		_ = common.NewResponse(req.ID).SetError(MethodNotFoundError(err.Error())).Send(w)
+		return
+	}
+
+	args, rpcErr := parseParams(m.GetArgsTypes()[1:], req.Params)
+	if rpcErr != nil {
+		_ = common.NewResponse(req.ID).SetError(InvalidParamsError(rpcErr.Error())).Send(w)
 		return
 	}
 
 	// Run procedure
-	ret, errCall := s.d.Run(p.Service, p.Method, req.Params)
+	ret, errCall := s.d.Run(p.Service, p.Method, args...)
 	if errCall != nil {
 		res := common.NewResponse(req.ID)
 
@@ -81,22 +93,23 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Retrieve response
-	res := ret[0].Interface()
+	// Check for error
+	if ret[1].Interface() != nil {
+		errCall, ok := ret[1].Interface().(error)
+		if !ok {
+			_ = common.NewResponse(req.ID).SetError(InternalError("could not retrieve function error")).Send(w)
+			return
+		}
 
-	// Retrieve error
-	errCall, ok := ret[1].Interface().(error)
-	if !ok {
-		_ = common.NewResponse(req.ID).SetError(InternalError("could not retrieve function error")).Send(w)
-		return
-	}
-
-	if errCall != nil {
-		_ = common.NewResponse(req.ID).SetError(InternalError(errCall))
+		// Send error
+		if errCall != nil {
+			_ = common.NewResponse(req.ID).SetError(InternalError(errCall)).Send(w)
+			return
+		}
 	}
 
 	// Send response
-	_ = common.NewResponse(req.ID).SetResult(res).Send(w)
+	_ = common.NewResponse(req.ID).SetResult(ret[0].Interface()).Send(w)
 }
 
 // Run start JSON RPC 2.0 server

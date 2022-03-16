@@ -1,5 +1,7 @@
 package common
 
+import "encoding/json"
+
 // RequestParam is a Structured value that holds the parameter values to be used
 // during the invocation of the method
 type RequestParam = interface{}
@@ -42,4 +44,8 @@ func (r *Request) SetMethod(method string) *Request {
 func (r *Request) SetParams(params RequestParam) *Request {
 	r.Params = params
 	return r
+}
+
+func (r *Request) Bytes() ([]byte, error) {
+	return json.Marshal(r)
 }

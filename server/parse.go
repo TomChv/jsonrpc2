@@ -119,6 +119,10 @@ func parseParams(args []reflect.Type, param interface{}) ([]interface{}, *RpcErr
 		return []interface{}{}, nil
 	case 1:
 		p, err := parseParam(args[0], param)
+		if err != nil {
+			return nil, err
+		}
+
 		return []interface{}{p}, err
 	default:
 		if reflect.TypeOf(param).Kind() != reflect.Slice {

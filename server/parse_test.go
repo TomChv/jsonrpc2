@@ -229,6 +229,12 @@ func TestParseMethod(t *testing.T) {
 }
 
 func TestParseParams(t *testing.T) {
+	type FakeStruct struct {
+		Id     int
+		Field1 bool
+		Field2 string
+	}
+
 	testCases := []struct {
 		name           string
 		success        bool
@@ -238,7 +244,7 @@ func TestParseParams(t *testing.T) {
 		expectedError  *RpcError
 	}{
 		{
-			name:           "Valid : no arguments",
+			name:           "no arguments",
 			success:        true,
 			args:           []reflect.Type{},
 			params:         nil,
@@ -246,7 +252,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse one arg : string",
+			name:           "parse one arg : string",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf("")},
 			params:         "foo",
@@ -254,7 +260,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse one arg : int",
+			name:           "parse one arg : int",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(4)},
 			params:         4,
@@ -262,7 +268,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse one arg : boolean",
+			name:           "parse one arg : boolean",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(true)},
 			params:         false,
@@ -270,7 +276,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse one arg : float",
+			name:           "parse one arg : float",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(float64(2))},
 			params:         float64(2),
@@ -278,7 +284,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse one arg : object",
+			name:           "parse one arg : object",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(struct{ Foo string }{Foo: ""})},
 			params:         struct{ Foo string }{Foo: "foo"},
@@ -286,7 +292,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse one arg : array",
+			name:           "parse one arg : array",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf([]int{0})},
 			params:         []int{1, 2, 3},
@@ -294,7 +300,15 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse multi arg : int",
+			name:           "parse on arg : type do not match",
+			success:        false,
+			args:           []reflect.Type{reflect.TypeOf(false)},
+			params:         []interface{}{"test"},
+			expectedResult: nil,
+			expectedError:  InvalidParamsError(""),
+		},
+		{
+			name:           "parse multi arg : int",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(0), reflect.TypeOf(0)},
 			params:         []int{1, 2},
@@ -302,7 +316,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse multi arg : string",
+			name:           "parse multi arg : string",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(""), reflect.TypeOf("")},
 			params:         []string{"foo", "bar"},
@@ -310,7 +324,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse multi arg : boolean",
+			name:           "parse multi arg : boolean",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(false)},
 			params:         []bool{false, true},
@@ -318,7 +332,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse multi arg : mix primitive type",
+			name:           "parse multi arg : mix primitive type",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf(0)},
 			params:         []interface{}{true, "foo", 5},
@@ -326,7 +340,7 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse multi arg : mix primitive type with array",
+			name:           "parse multi arg : mix primitive type with array",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf([]int{0})},
 			params:         []interface{}{true, "foo", []int{1, 2, 3}},
@@ -334,12 +348,28 @@ func TestParseParams(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Valid : parse multi arg : mix primitive type with array and object",
+			name:           "parse multi arg : mix primitive type with array and object",
 			success:        true,
 			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf([]int{0}), reflect.TypeOf(struct{ Foo string }{Foo: ""})},
 			params:         []interface{}{true, "foo", []int{1, 2, 3}, struct{ Foo string }{Foo: "foo"}},
 			expectedResult: []interface{}{true, "foo", []int{1, 2, 3}, struct{ Foo string }{Foo: "foo"}},
 			expectedError:  nil,
+		},
+		{
+			name:           "parse multi arg : mix primitive type with array and object",
+			success:        true,
+			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf(""), reflect.TypeOf([]int{0}), reflect.TypeOf(FakeStruct{})},
+			params:         []interface{}{true, "foo", []int{1, 2, 3}, FakeStruct{0, true, "struct"}},
+			expectedResult: []interface{}{true, "foo", []int{1, 2, 3}, FakeStruct{0, true, "struct"}},
+			expectedError:  nil,
+		},
+		{
+			name:           "parse multi arg : type do not match",
+			success:        false,
+			args:           []reflect.Type{reflect.TypeOf(false), reflect.TypeOf("")},
+			params:         []interface{}{true, 4},
+			expectedResult: nil,
+			expectedError:  InvalidParamsError(""),
 		},
 	}
 
@@ -348,7 +378,7 @@ func TestParseParams(t *testing.T) {
 			res, err := parseParams(tt.args, tt.params)
 
 			assert.Equal(t, tt.expectedResult, res)
-			assert.Equal(t, tt.expectedError, err)
+			assert.IsType(t, tt.expectedError, err)
 		})
 	}
 }

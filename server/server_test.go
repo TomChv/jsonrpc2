@@ -1,9 +1,15 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/PtitLuca/go-dispatcher/dispatcher"
 	"github.com/TomChv/jsonrpc2/common"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,32 +32,41 @@ func (ms *mockInvalidService2) MethodInvalidIncompleteReturnType() interface{} {
 type mockService struct{}
 
 func (ms mockService) MethodEmptyArgs() (interface{}, error) {
-	return nil, nil
+	return "foo", nil
 }
 
-func (ms mockService) MethodWithArg(str string) (string, error) {
+func (ms mockService) MethodWithArgString(str string) (string, error) {
 	return str, nil
 }
 
-func (ms mockService) MethodWithArgs(str string, num int64) (map[string]interface{}, *RpcError) {
+func (ms mockService) MethodWithArgNumber(num int) (int, error) {
+	return num, nil
+}
+
+func (ms mockService) MethodWithArgFloat(float float64) (float64, error) {
+	return float, nil
+}
+
+func (ms mockService) MethodWithArgs(str string, num int64) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"str": str,
 		"num": num,
 	}, nil
 }
 
-func (ms mockService) MethodWithComplexArgs(str []string, num int64, b bool, obj interface{}) (*Response, error) {
-	return common.NewResponse("0").SetResult(struct {
-		Str    []string
-		Num    int64
-		Bool   bool
-		Object interface{}
-	}{
-		Str:    str,
-		Num:    num,
-		Bool:   b,
-		Object: obj,
-	}), nil
+type FakeStruct struct {
+	Id     int
+	Field1 bool
+	Field2 string
+}
+
+func (ms mockService) MethodWithComplexArgs(str []string, num int8, b bool, obj FakeStruct) (map[string]interface{}, error) {
+	return map[string]interface{}{
+		"str":    str,
+		"num":    num,
+		"bool":   b,
+		"object": obj,
+	}, nil
 }
 
 func TestJsonRPC2_Register(t *testing.T) {
@@ -96,7 +111,121 @@ func TestJsonRPC2_Register(t *testing.T) {
 }
 
 func TestJsonRPC2_ServeHTTP(t *testing.T) {
-	t.Skip("TODO")
+	s := New(context.TODO())
+	err := s.Register("mock", &mockService{})
+	assert.Equal(t, nil, err)
+
+	testCases := []struct {
+		name             string
+		success          bool
+		req              *Request
+		expectedResponse *Response
+	}{
+		{
+			name:             "call MethodEmptyArgs",
+			success:          true,
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
+			expectedResponse: common.NewResponse("fake_id").SetResult("foo"),
+		},
+		{
+			name:             "call MethodWithArgString",
+			success:          true,
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgString").SetParams("bar"),
+			expectedResponse: common.NewResponse("fake_id").SetResult("bar"),
+		},
+		{
+			name:             "call MethodWithArgNumber",
+			success:          true,
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgNumber").SetParams(4),
+			expectedResponse: common.NewResponse("fake_id").SetResult(float64(4)),
+		},
+		{
+			name:             "call MethodWithArgFloat",
+			success:          true,
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgFloat").SetParams(-2),
+			expectedResponse: common.NewResponse("fake_id").SetResult(float64(-2)),
+		},
+		{
+			name:    "call MethodWithArgs",
+			success: true,
+			req:     common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", 25}),
+			expectedResponse: common.NewResponse("fake_id").SetResult(map[string]interface{}{
+				"str": "foo",
+				"num": float64(25),
+			}),
+		},
+		{
+			name:    "call MethodWithComplexArgs",
+			success: true,
+			req: common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithComplexArgs").SetParams([]interface{}{
+				[]string{"foo", "bar"},
+				25,
+				false,
+				FakeStruct{0, true, "fakeStruct"},
+			}),
+			expectedResponse: common.NewResponse("fake_id").SetResult(map[string]interface{}{
+				"str":  []interface{}{"foo", "bar"},
+				"num":  float64(25),
+				"bool": false,
+				"object": map[string]interface{}{
+					"Id":     float64(0),
+					"Field1": true,
+					"Field2": "fakeStruct",
+				},
+			}),
+		},
+		{
+			name:             "call MethodEmptyArgs with int identifier",
+			success:          true,
+			req:              common.NewRequest().SetID(-1).SetMethod("mock_methodEmptyArgs"),
+			expectedResponse: common.NewResponse(float64(-1)).SetResult("foo"),
+		},
+		{
+			name:             "call MethodEmptyArgs with no identifier",
+			success:          true,
+			req:              common.NewRequest().SetMethod("mock_methodEmptyArgs"),
+			expectedResponse: common.NewResponse(nil).SetResult("foo"),
+		},
+		{
+			name:             "call unknown method",
+			success:          false,
+			req:              common.NewRequest().SetID("fake_id").SetMethod("unknown"),
+			expectedResponse: common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
+		},
+		{
+			name:             "call with empty body",
+			success:          false,
+			req:              common.NewRequest(),
+			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(ErrNoMethodProvided.Error())),
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			body, err := tt.req.Bytes()
+			assert.Equal(t, nil, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+
+			s.ServeHTTP(w, req)
+
+			res := w.Result()
+			defer res.Body.Close()
+			data, err := ioutil.ReadAll(res.Body)
+			assert.Equal(t, nil, err)
+
+			var resData Response
+			err = json.Unmarshal(data, &resData)
+			assert.Equal(t, nil, err)
+
+			if resData.Result != nil {
+				assert.Equal(t, *tt.expectedResponse, resData)
+			} else {
+				assert.Equal(t, tt.expectedResponse.Error, resData.Error)
+			}
+		})
+	}
 }
 
 func TestJsonRPC2_Run(t *testing.T) {

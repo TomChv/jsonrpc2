@@ -1,14 +1,18 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
 	"github.com/TomChv/jsonrpc2/common"
+	"github.com/TomChv/jsonrpc2/parser"
+	"github.com/TomChv/jsonrpc2/validator"
 )
 
 type Response = common.Response
@@ -45,32 +49,36 @@ func (s *JsonRPC2) Register(namespace string, service interface{}) error {
 	return nil
 }
 
-// Implement HTTP interface to listen and response to incoming HTTP request
-func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Parse request
-	req, rpcErr := parseRequest(r)
-	if rpcErr != nil {
-		_ = common.NewResponse(nil).SetError(rpcErr).Send(w)
-		return
+// isBatchRequest return true if the request is wrapped with square brackets.
+func isBatchRequest(r *http.Request) (bool, error) {
+	buf, _ := ioutil.ReadAll(r.Body)
+
+	body := ioutil.NopCloser(bytes.NewReader(buf))
+	data, err := ioutil.ReadAll(body)
+	if err != nil {
+		return false, err
 	}
 
-	// Use dispatcher
-	p, rpcErr := parseMethod(req.Method)
-	if rpcErr != nil {
-		_ = common.NewResponse(req.ID).SetError(rpcErr).Send(w)
-		return
+	// Reset body
+	r.Body = ioutil.NopCloser(bytes.NewReader(buf))
+	return data[0] == '[' && data[len(data)-1] == ']', nil
+}
+
+func (s *JsonRPC2) handle(req *Request) *Response {
+	p, err := parser.Method(req.Method)
+	if err != nil {
+		return common.NewResponse(req.ID).SetError(InvalidRequestError(err.Error()))
 	}
 
 	m, err := s.d.GetMethod(p.Service, p.Method)
 	if err != nil {
-		_ = common.NewResponse(req.ID).SetError(MethodNotFoundError(err.Error())).Send(w)
-		return
+		return common.NewResponse(req.ID).SetError(MethodNotFoundError(err.Error()))
+
 	}
 
-	args, rpcErr := parseParams(m.GetArgsTypes()[1:], req.Params)
-	if rpcErr != nil {
-		_ = common.NewResponse(req.ID).SetError(InvalidParamsError(rpcErr.Error())).Send(w)
-		return
+	args, err := parser.Arguments(m.GetArgsTypes()[1:], req.Params)
+	if err != nil {
+		return common.NewResponse(req.ID).SetError(InvalidParamsError(err.Error()))
 	}
 
 	// Run procedure
@@ -89,27 +97,55 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			res.SetError(InternalError(errCall.Error()))
 		}
 
-		_ = res.Send(w)
-		return
+		return res
 	}
 
 	// Check for error
 	if ret[1].Interface() != nil {
 		errCall, ok := ret[1].Interface().(error)
 		if !ok {
-			_ = common.NewResponse(req.ID).SetError(InternalError("could not retrieve function error")).Send(w)
-			return
+			return common.NewResponse(req.ID).SetError(InternalError("could not retrieve function error"))
 		}
 
 		// Send error
 		if errCall != nil {
-			_ = common.NewResponse(req.ID).SetError(InternalError(errCall)).Send(w)
-			return
+			return common.NewResponse(req.ID).SetError(InternalError(errCall))
 		}
 	}
 
 	// Send response
-	_ = common.NewResponse(req.ID).SetResult(ret[0].Interface()).Send(w)
+	return common.NewResponse(req.ID).SetResult(ret[0].Interface())
+}
+
+// Implement HTTP interface to listen and response to incoming HTTP request
+func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := validator.HTTPRequest(r); err != nil {
+		_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+		return
+	}
+
+	isBatch, err := isBatchRequest(r)
+	if err != nil {
+		_ = common.NewResponse(nil).SetError(ParsingError(err.Error())).Send(w)
+		return
+	}
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		_ = common.NewResponse(nil).SetError(ParsingError(err.Error())).Send(w)
+		return
+	}
+
+	if !isBatch {
+		req, err := parser.Request(body)
+		if err != nil {
+			_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+			return
+		}
+
+		_ = s.handle(req).Send(w)
+		return
+	}
 }
 
 // Run start JSON RPC 2.0 server

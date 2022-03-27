@@ -11,6 +11,7 @@ import (
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
 	"github.com/TomChv/jsonrpc2/common"
+	"github.com/TomChv/jsonrpc2/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -110,7 +111,7 @@ func TestJsonRPC2_Register(t *testing.T) {
 	}
 }
 
-func TestJsonRPC2_ServeHTTP(t *testing.T) {
+func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 	s := New(context.TODO())
 	err := s.Register("mock", &mockService{})
 	assert.Equal(t, nil, err)
@@ -196,7 +197,7 @@ func TestJsonRPC2_ServeHTTP(t *testing.T) {
 			name:             "call with empty body",
 			success:          false,
 			req:              common.NewRequest(),
-			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(ErrNoMethodProvided.Error())),
+			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
 		},
 	}
 

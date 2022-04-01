@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
 	"github.com/TomChv/jsonrpc2/common"
@@ -77,7 +78,39 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = common.NewResponse(nil).SetError(InternalError("batch request are not implemented")).Send(w)
+	ok, reqs, errs := parser.Batch(body)
+	if !ok {
+		_ = common.NewResponse(nil).SetError(InvalidRequestError("could not parse request")).Send(w)
+		return
+	}
+
+	res := []*Response{}
+	for _, err := range errs {
+		res = append(res, common.NewResponse(nil).SetError(InvalidRequestError(err.Error())))
+	}
+
+	// Handle concurrency
+	var (
+		wg sync.WaitGroup
+		l  sync.Mutex
+	)
+
+	for _, req := range reqs {
+		req := req
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			r := s.handle(req)
+
+			l.Lock()
+			defer l.Unlock()
+			res = append(res, r)
+		}()
+	}
+
+	wg.Wait()
+	_ = s.sendBatch(res, w)
 }
 
 // Run start JSON RPC 2.0 server
@@ -88,6 +121,7 @@ func (s *JsonRPC2) Run(port string) error {
 	go func() {
 		err := http.ListenAndServe(addr, s)
 		if err != nil {
+			log.Println(err)
 			cancel()
 		}
 	}()

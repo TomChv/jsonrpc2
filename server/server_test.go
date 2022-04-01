@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
 	"github.com/TomChv/jsonrpc2/common"
@@ -53,6 +54,11 @@ func (ms mockService) MethodWithArgs(str string, num int64) (map[string]interfac
 		"str": str,
 		"num": num,
 	}, nil
+}
+
+func (ms mockService) MethodWithSleep(sec int64) (string, error) {
+	time.Sleep(time.Second * time.Duration(sec))
+	return "slept well", nil
 }
 
 type FakeStruct struct {
@@ -216,15 +222,112 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 			data, err := ioutil.ReadAll(res.Body)
 			assert.Equal(t, nil, err)
 
-			var resData Response
+			var resData *Response
 			err = json.Unmarshal(data, &resData)
 			assert.Equal(t, nil, err)
 
-			if resData.Result != nil {
-				assert.Equal(t, *tt.expectedResponse, resData)
-			} else {
-				assert.Equal(t, tt.expectedResponse.Error, resData.Error)
+			assert.Equal(t, tt.expectedResponse, resData)
+		})
+	}
+}
+
+func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
+	s := New(context.TODO())
+	err := s.Register("mock", &mockService{})
+	assert.Equal(t, nil, err)
+
+	testCases := []struct {
+		name              string
+		success           bool
+		reqs              []*Request
+		expectedResponses []*Response
+		timeout           time.Duration
+	}{
+		{
+			name:              "Simple request [MethodEmptyArgs]",
+			success:           true,
+			reqs:              []*Request{common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs")},
+			expectedResponses: []*Response{common.NewResponse("fake_id").SetResult("foo")},
+		},
+		{
+			name:              "Simple request [Empty body]",
+			success:           true,
+			reqs:              []*Request{common.NewRequest()},
+			expectedResponses: []*Response{common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error()))},
+		},
+		{
+			name:    "Batch request [MethodEmptyArgs, Unknown Method]",
+			success: true,
+			reqs: []*Request{
+				common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
+				common.NewRequest().SetID("fake_id").SetMethod("unknown"),
+			},
+			expectedResponses: []*Response{
+				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
+				common.NewResponse("fake_id").SetResult("foo"),
+			},
+		},
+		{
+			name:    "Batch request [MethodWithSleep, MethodWithSleep, MethodWithSleep] : test concurrency",
+			success: true,
+			reqs: []*Request{
+				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams(int64(3)),
+				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams(int64(5)),
+				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams(int64(2)),
+			},
+			expectedResponses: []*Response{
+				common.NewResponse("sleep_fast").SetResult("slept well"),
+				common.NewResponse("sleep_medium").SetResult("slept well"),
+				common.NewResponse("sleep_long").SetResult("slept well"),
+			},
+			timeout: time.Second * 7,
+		},
+		{
+			name:    "Batch request [Unknown Method, MethodWithSleep, MethodWithSleep, MethodWithSleep, Empty body]",
+			success: true,
+			reqs: []*Request{
+				common.NewRequest().SetID("fake_id").SetMethod("unknown"),
+				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams(int64(3)),
+				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams(int64(5)),
+				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams(int64(1)),
+				common.NewRequest(),
+			},
+			expectedResponses: []*Response{
+				common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
+				common.NewResponse("sleep_fast").SetResult("slept well"),
+				common.NewResponse("sleep_medium").SetResult("slept well"),
+				common.NewResponse("sleep_long").SetResult("slept well"),
+			},
+			timeout: time.Second * 7,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			body, err := json.Marshal(tt.reqs)
+			assert.Equal(t, nil, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+			w := httptest.NewRecorder()
+
+			start := time.Now()
+			s.ServeHTTP(w, req)
+
+			res := w.Result()
+			defer res.Body.Close()
+
+			if tt.timeout != 0 && time.Since(start) > tt.timeout {
+				assert.Fail(t, "test reached timeout")
 			}
+
+			data, err := ioutil.ReadAll(res.Body)
+			assert.Equal(t, nil, err)
+
+			var resData []*Response
+			err = json.Unmarshal(data, &resData)
+			assert.Equal(t, nil, err)
+			assert.Equal(t, tt.expectedResponses, resData)
 		})
 	}
 }

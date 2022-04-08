@@ -7,7 +7,6 @@ import (
 )
 
 var (
-	ErrInvalidArgsNumber       = errors.New("invalid number of arguments")
 	ErrInvalidArgExpectedSlice = errors.New("invalid argument, expected slice")
 	ErrInvalidArgType          = errors.New("invalid arg type")
 )
@@ -17,22 +16,23 @@ var (
 //   If 1 arg           -> directly parse the param and return it a single
 //   IF 2 or more arg   -> verify that param is an array and loop through it to
 //  convert it to an array of interface with correct type
+//  Argument type must be type of struct (object) or array
 func Arguments(args []reflect.Type, param interface{}) ([]interface{}, error) {
-	switch len(args) {
-	case 0:
+	if len(args) == 0 {
 		return []interface{}{}, nil
-	case 1:
+	}
+
+	paramKind := reflect.TypeOf(param).Kind()
+	switch {
+	// If argument is type of struct or if it's only 1 argument that is type of array
+	case paramKind == reflect.Struct, len(args) == 1 && args[0].Kind() == reflect.Slice:
 		p, err := parseArgument(args[0], param)
 		if err != nil {
 			return nil, err
 		}
 
 		return []interface{}{p}, err
-	default:
-		if reflect.TypeOf(param).Kind() != reflect.Slice {
-			return nil, ErrInvalidArgsNumber
-		}
-
+	case paramKind == reflect.Slice:
 		params, err := convertInterfaceToArray(param)
 		if err != nil {
 			return nil, err
@@ -48,6 +48,8 @@ func Arguments(args []reflect.Type, param interface{}) ([]interface{}, error) {
 		}
 
 		return res, nil
+	default:
+		return nil, ErrInvalidArgType
 	}
 }
 

@@ -137,19 +137,19 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 		{
 			name:             "call MethodWithArgString",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgString").SetParams("bar"),
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgString").SetParams([]string{"bar"}),
 			expectedResponse: common.NewResponse("fake_id").SetResult("bar"),
 		},
 		{
 			name:             "call MethodWithArgNumber",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgNumber").SetParams(4),
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgNumber").SetParams([]int{4}),
 			expectedResponse: common.NewResponse("fake_id").SetResult(float64(4)),
 		},
 		{
 			name:             "call MethodWithArgFloat",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgFloat").SetParams(-2),
+			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgFloat").SetParams([]float64{-2}),
 			expectedResponse: common.NewResponse("fake_id").SetResult(float64(-2)),
 		},
 		{
@@ -271,9 +271,9 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			name:    "Batch request [MethodWithSleep, MethodWithSleep, MethodWithSleep] : test concurrency",
 			success: true,
 			reqs: []*Request{
-				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams(int64(3)),
-				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams(int64(5)),
-				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams(int64(2)),
+				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
+				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
+				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{2}),
 			},
 			expectedResponses: []*Response{
 				common.NewResponse("sleep_fast").SetResult("slept well"),
@@ -287,9 +287,9 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			success: true,
 			reqs: []*Request{
 				common.NewRequest().SetID("fake_id").SetMethod("unknown"),
-				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams(int64(3)),
-				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams(int64(5)),
-				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams(int64(1)),
+				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
+				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
+				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{1}),
 				common.NewRequest(),
 			},
 			expectedResponses: []*Response{

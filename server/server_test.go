@@ -313,6 +313,49 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			},
 			timeout: time.Second * 7,
 		},
+		{
+			name:    "Simple request [Only Method, Invalid json rpc version]",
+			success: true,
+			reqs: []*Request{
+				common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
+				{JsonRpc: "3.0", Method: "/test"},
+			},
+			expectedResponses: []*Response{
+				common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion.Error())),
+				common.NewResponse("fake_id").SetResult("foo"),
+			},
+		},
+		{
+			name:    "Simple request [Invalid json rpc version, Missing method]",
+			success: true,
+			reqs: []*Request{
+				{JsonRpc: "3.0", Method: "/test"},
+				common.NewRequest().SetID(0),
+			},
+			expectedResponses: []*Response{
+				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+				common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion.Error())),
+			},
+		},
+		{
+			name:    "Simple request [MethodWithArgString, Missing method, String identifier, MethodWithArgs]",
+			success: true,
+			reqs: []*Request{
+				common.NewRequest().SetID(4).SetMethod("mock_methodWithArgString").SetParams([]string{"foo"}),
+				common.NewRequest().SetID(0),
+				common.NewRequest().SetID("fake_id_number").SetMethod("mock_methodWithArgNumber").SetParams([]int64{687}),
+				common.NewRequest().SetID("fake_id_args").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", -1}),
+			},
+			expectedResponses: []*Response{
+				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+				common.NewResponse("fake_id_args").SetResult(map[string]interface{}{
+					"str": "foo",
+					"num": float64(-1),
+				}),
+				common.NewResponse(float64(4)).SetResult("foo"),
+				common.NewResponse("fake_id_number").SetResult(float64(687)),
+			},
+		},
 	}
 
 	for _, tt := range testCases {

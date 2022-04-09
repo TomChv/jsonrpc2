@@ -83,16 +83,13 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, reqs, errs := parser.Batch(body)
-	if !ok {
-		_ = common.NewResponse(nil).SetError(InvalidRequestError("could not parse request")).Send(w)
+	reqs, err := parser.Batch(body)
+	if err != nil {
+		_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
 		return
 	}
 
 	res := []*Response{}
-	for _, err := range errs {
-		res = append(res, common.NewResponse(nil).SetError(InvalidRequestError(err.Error())))
-	}
 
 	// Handle concurrency
 	var (
@@ -103,10 +100,19 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, req := range reqs {
 		req := req
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 
-			r := s.handle(req)
+			var r *common.Response
+			if err := validator.JsonRPCRequest(req); err != nil {
+				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+				if req != nil && req.ID != nil {
+					r.SetID(req.ID)
+				}
+			} else {
+				r = s.handle(req)
+			}
 
 			l.Lock()
 			defer l.Unlock()

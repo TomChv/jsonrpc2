@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/TomChv/jsonrpc2/common"
-	"github.com/TomChv/jsonrpc2/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,7 +13,7 @@ func TestBatch(t *testing.T) {
 		body           []byte
 		success        bool
 		expectedResult []*common.Request
-		expectedError  []error
+		expectedError  error
 	}{
 		{
 			name:           "Empty array",
@@ -31,25 +30,34 @@ func TestBatch(t *testing.T) {
 			expectedError:  nil,
 		},
 		{
-			name:           "Simple request [Only Method, Invalid json rpc version]",
-			body:           []byte(`[{"jsonrpc": "2.0", "method": "/test"},{"jsonrpc": "3.0","method": "/test"}]`),
-			success:        true,
-			expectedResult: []*common.Request{common.NewRequest().SetMethod("/test")},
-			expectedError:  []error{validator.ErrInvalidJsonVersion},
+			name:    "Simple request [Only Method, Invalid json rpc version]",
+			body:    []byte(`[{"jsonrpc": "2.0", "method": "/test"},{"jsonrpc": "3.0","method": "/test"}]`),
+			success: true,
+			expectedResult: []*common.Request{
+				common.NewRequest().SetMethod("/test"),
+				{JsonRpc: "3.0", Method: "/test"},
+			},
+			expectedError: nil,
 		},
 		{
-			name:           "Simple request [Missing method, Invalid json rpc version]",
-			body:           []byte(`[{"jsonrpc": "2.0", "id": 0},{"jsonrpc": "3.0","method": "/test"}]`),
-			success:        true,
-			expectedResult: []*common.Request{},
-			expectedError:  []error{validator.ErrMissingMethod, validator.ErrInvalidJsonVersion},
+			name:    "Simple request [Missing method, Invalid json rpc version]",
+			body:    []byte(`[{"jsonrpc": "2.0", "id": 0},{"jsonrpc": "3.0","method": "/test"}]`),
+			success: true,
+			expectedResult: []*common.Request{
+				common.NewRequest().SetID(float64(0)),
+				{JsonRpc: "3.0", Method: "/test"},
+			},
+			expectedError: nil,
 		},
 		{
-			name:           "Simple request [Invalid json rpc version, Missing method]",
-			body:           []byte(`[{"jsonrpc": "3.0","method": "/test"},{"jsonrpc": "2.0", "id": 0}]`),
-			success:        true,
-			expectedResult: []*common.Request{},
-			expectedError:  []error{validator.ErrInvalidJsonVersion, validator.ErrMissingMethod},
+			name:    "Simple request [Invalid json rpc version, Missing method]",
+			body:    []byte(`[{"jsonrpc": "3.0","method": "/test"},{"jsonrpc": "2.0", "id": 0}]`),
+			success: true,
+			expectedResult: []*common.Request{
+				{JsonRpc: "3.0", Method: "/test"},
+				common.NewRequest().SetID(float64(0)),
+			},
+			expectedError: nil,
 		},
 		{
 			name:    "Batch request [Only Method, Missing method, String identifier]",
@@ -57,9 +65,10 @@ func TestBatch(t *testing.T) {
 			success: true,
 			expectedResult: []*common.Request{
 				common.NewRequest().SetMethod("/test"),
+				common.NewRequest().SetID(float64(0)),
 				common.NewRequest().SetMethod("/test").SetID("fake_id"),
 			},
-			expectedError: []error{validator.ErrMissingMethod},
+			expectedError: nil,
 		},
 		{
 			name:    "Batch request [Only Method, Missing method, String identifier, With param struct]",
@@ -67,21 +76,21 @@ func TestBatch(t *testing.T) {
 			success: true,
 			expectedResult: []*common.Request{
 				common.NewRequest().SetMethod("/test"),
+				common.NewRequest().SetID(float64(0)),
 				common.NewRequest().SetMethod("/test").SetID("fake_id"),
 				common.NewRequest().SetMethod("/test").SetParams(map[string]interface{}{
 					"foo": "bar",
 					"baz": float64(4),
 				}),
 			},
-			expectedError: []error{validator.ErrMissingMethod},
+			expectedError: nil,
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			ok, res, err := Batch(tt.body)
+			res, err := Batch(tt.body)
 
-			assert.Equal(t, tt.success, ok)
 			assert.Equal(t, tt.expectedResult, res)
 			assert.Equal(t, tt.expectedError, err)
 		})

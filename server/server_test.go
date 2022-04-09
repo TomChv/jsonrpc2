@@ -205,6 +205,18 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 			req:              common.NewRequest(),
 			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
 		},
+		{
+			name:             "call with missing method and identifier",
+			success:          true,
+			req:              common.NewRequest().SetID("fake_id"),
+			expectedResponse: common.NewResponse("fake_id").SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+		},
+		{
+			name:             "call with missing method and invalid identifier",
+			success:          true,
+			req:              common.NewRequest().SetID(false),
+			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidIdentifierType.Error())),
+		},
 	}
 
 	for _, tt := range testCases {
@@ -327,7 +339,9 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			var resData []*Response
 			err = json.Unmarshal(data, &resData)
 			assert.Equal(t, nil, err)
-			assert.Equal(t, tt.expectedResponses, resData)
+
+			assert.ElementsMatch(t, tt.expectedResponses, resData)
+			//assert.Equal(t, , )
 		})
 	}
 }

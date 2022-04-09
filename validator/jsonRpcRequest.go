@@ -14,14 +14,6 @@ var (
 )
 
 func JsonRPCRequest(req *common.Request) error {
-	if req.JsonRpc != common.JSON_RPC_VERSION {
-		return ErrInvalidJsonVersion
-	}
-
-	if req.Method == "" {
-		return ErrMissingMethod
-	}
-
 	if req.ID != nil {
 		switch reflect.TypeOf(req.ID).String() {
 		case "string":
@@ -35,8 +27,17 @@ func JsonRPCRequest(req *common.Request) error {
 			// nolint:forcetypeassert
 			req.SetID(int(req.ID.(float64)))
 		default:
+			req.SetID(nil)
 			return ErrInvalidIdentifierType
 		}
+	}
+
+	if req.JsonRpc != common.JSON_RPC_VERSION {
+		return ErrInvalidJsonVersion
+	}
+
+	if req.Method == "" {
+		return ErrMissingMethod
 	}
 
 	return nil

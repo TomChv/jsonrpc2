@@ -70,7 +70,12 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !isBatch {
 		req, err := parser.Request(body)
 		if err != nil {
-			_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+			res := common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+			if req != nil && req.ID != nil {
+				res.SetID(req.ID)
+			}
+
+			_ = res.Send(w)
 			return
 		}
 

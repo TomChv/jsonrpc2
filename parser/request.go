@@ -16,7 +16,8 @@ var (
 //
 // If the request does not match JSON RPC specification, it returns
 // an error
-// TODO(TomChv): Fix #8
+// In any case, Request will return a request struct (null or filled) to
+// let server returns an identifier if one is found
 func Request(body []byte) (*common.Request, error) {
 	var req common.Request
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -24,7 +25,7 @@ func Request(body []byte) (*common.Request, error) {
 	}
 
 	if err := validator.JsonRPCRequest(&req); err != nil {
-		return nil, err
+		return &req, err
 	}
 
 	return &req, nil

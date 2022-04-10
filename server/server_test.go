@@ -188,10 +188,16 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 			expectedResponse: common.NewResponse(float64(-1)).SetResult("foo"),
 		},
 		{
-			name:             "call MethodEmptyArgs with no identifier",
+			name:             "call MethodEmptyArgs with notification",
 			success:          true,
 			req:              common.NewRequest().SetMethod("mock_methodEmptyArgs"),
-			expectedResponse: common.NewResponse(nil).SetResult("foo"),
+			expectedResponse: nil,
+		},
+		{
+			name:             "call MethodWithArgs",
+			success:          true,
+			req:              common.NewRequest().SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", 25}),
+			expectedResponse: nil,
 		},
 		{
 			name:             "call unknown method",
@@ -230,6 +236,12 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 			s.ServeHTTP(w, req)
 
 			res := w.Result()
+
+			if tt.expectedResponse == nil {
+				assert.Equal(t, int64(-1), res.ContentLength)
+				return
+			}
+
 			defer res.Body.Close()
 			data, err := ioutil.ReadAll(res.Body)
 			assert.Equal(t, nil, err)
@@ -265,7 +277,7 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			name:              "Simple request [Empty body]",
 			success:           true,
 			reqs:              []*Request{common.NewRequest()},
-			expectedResponses: []*Response{common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error()))},
+			expectedResponses: nil,
 		},
 		{
 			name:    "Batch request [MethodEmptyArgs, Unknown Method]",
@@ -302,10 +314,8 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
 				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
 				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{1}),
-				common.NewRequest(),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
 				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
 				common.NewResponse("sleep_fast").SetResult("slept well"),
 				common.NewResponse("sleep_medium").SetResult("slept well"),
@@ -318,10 +328,8 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			success: true,
 			reqs: []*Request{
 				common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
-				{JsonRpc: "3.0", Method: "/test"},
 			},
 			expectedResponses: []*Response{
-				common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion.Error())),
 				common.NewResponse("fake_id").SetResult("foo"),
 			},
 		},
@@ -329,12 +337,10 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			name:    "Simple request [Invalid json rpc version, Missing method]",
 			success: true,
 			reqs: []*Request{
-				{JsonRpc: "3.0", Method: "/test"},
 				common.NewRequest().SetID(0),
 			},
 			expectedResponses: []*Response{
 				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
-				common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion.Error())),
 			},
 		},
 		{
@@ -370,6 +376,11 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			s.ServeHTTP(w, req)
 
 			res := w.Result()
+			if tt.expectedResponses == nil {
+				assert.Equal(t, int64(-1), res.ContentLength)
+				return
+			}
+
 			defer res.Body.Close()
 
 			if tt.timeout != 0 && time.Since(start) > tt.timeout {
@@ -384,7 +395,6 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 			assert.Equal(t, nil, err)
 
 			assert.ElementsMatch(t, tt.expectedResponses, resData)
-			//assert.Equal(t, , )
 		})
 	}
 }

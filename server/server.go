@@ -79,7 +79,10 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_ = s.handle(req).Send(w)
+		r := s.handle(req)
+		if r.ID != nil {
+			_ = r.Send(w)
+		}
 		return
 	}
 
@@ -112,6 +115,10 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			} else {
 				r = s.handle(req)
+			}
+
+			if r.ID == nil {
+				return
 			}
 
 			l.Lock()

@@ -9,6 +9,7 @@ import (
 var (
 	ErrInvalidArgExpectedSlice = errors.New("invalid argument, expected slice")
 	ErrInvalidArgType          = errors.New("invalid arg type")
+	ErrNoParamFound            = errors.New("expected parameters but no one found")
 )
 
 // Arguments convert any param into types send in args
@@ -22,10 +23,15 @@ func Arguments(args []reflect.Type, param interface{}) ([]interface{}, error) {
 		return []interface{}{}, nil
 	}
 
+	if param == nil {
+		return nil, ErrNoParamFound
+	}
+
 	paramKind := reflect.TypeOf(param).Kind()
 	switch {
 	// If argument is type of struct or if it's only 1 argument that is type of array
-	case paramKind == reflect.Struct, len(args) == 1 && args[0].Kind() == reflect.Slice:
+	case paramKind == reflect.Struct, paramKind == reflect.Map,
+		len(args) == 1 && args[0].Kind() == reflect.Slice:
 		p, err := parseArgument(args[0], param)
 		if err != nil {
 			return nil, err

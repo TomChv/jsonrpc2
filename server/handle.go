@@ -8,6 +8,8 @@ import (
 	"github.com/TomChv/jsonrpc2/parser"
 )
 
+var ErrNoFunctionErrorFound = errors.New("could not retrieve function error")
+
 // handle json RPC 2 request :
 //   - Retrieve procedure to call
 //   - Convert arguments to their type
@@ -16,33 +18,33 @@ import (
 func (s *JsonRPC2) handle(req *Request) *Response {
 	p, err := parser.Method(req.Method)
 	if err != nil {
-		return common.NewResponse(req.ID).SetError(InvalidRequestError(err.Error()))
+		return common.NewResponse(req.ID).SetError(InvalidRequestError(err))
 	}
 
 	m, err := s.d.GetMethod(p.Service, p.Method)
 	if err != nil {
-		return common.NewResponse(req.ID).SetError(MethodNotFoundError(err.Error()))
+		return common.NewResponse(req.ID).SetError(MethodNotFoundError(err))
 	}
 
 	args, err := parser.Arguments(m.GetArgsTypes()[1:], req.Params)
 	if err != nil {
-		return common.NewResponse(req.ID).SetError(InvalidParamsError(err.Error()))
+		return common.NewResponse(req.ID).SetError(InvalidParamsError(err))
 	}
 
 	// Run procedure
-	ret, errCall := s.d.Run(p.Service, p.Method, args...)
-	if errCall != nil {
+	ret, err := s.d.Run(p.Service, p.Method, args...)
+	if err != nil {
 		res := common.NewResponse(req.ID)
 
 		switch {
-		case errors.Is(errCall, dispatcher.ErrNonExistentMethod) ||
-			errors.Is(errCall, dispatcher.ErrNonExistentService):
-			res.SetError(MethodNotFoundError(errCall.Error()))
-		case errors.Is(errCall, dispatcher.ErrInvalidArgumentType) ||
-			errors.Is(errCall, dispatcher.ErrInvalidArgumentsCount):
-			res.SetError(InvalidParamsError(errCall.Error()))
+		case errors.Is(err, dispatcher.ErrNonExistentMethod) ||
+			errors.Is(err, dispatcher.ErrNonExistentService):
+			res.SetError(MethodNotFoundError(err))
+		case errors.Is(err, dispatcher.ErrInvalidArgumentType) ||
+			errors.Is(err, dispatcher.ErrInvalidArgumentsCount):
+			res.SetError(InvalidParamsError(err))
 		default:
-			res.SetError(InternalError(errCall.Error()))
+			res.SetError(InternalError(err))
 		}
 
 		return res
@@ -50,14 +52,14 @@ func (s *JsonRPC2) handle(req *Request) *Response {
 
 	// Check for error
 	if ret[1].Interface() != nil {
-		errCall, ok := ret[1].Interface().(error)
+		err, ok := ret[1].Interface().(error)
 		if !ok {
-			return common.NewResponse(req.ID).SetError(InternalError("could not retrieve function error"))
+			return common.NewResponse(req.ID).SetError(InternalError(ErrNoFunctionErrorFound))
 		}
 
 		// Send error
-		if errCall != nil {
-			return common.NewResponse(req.ID).SetError(InternalError(errCall))
+		if err != nil {
+			return common.NewResponse(req.ID).SetError(InternalError(err))
 		}
 	}
 

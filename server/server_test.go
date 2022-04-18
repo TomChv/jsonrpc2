@@ -203,25 +203,25 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 			name:             "call unknown method",
 			success:          false,
 			req:              common.NewRequest().SetID("fake_id").SetMethod("unknown"),
-			expectedResponse: common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
+			expectedResponse: common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
 		},
 		{
 			name:             "call with empty body",
 			success:          false,
 			req:              common.NewRequest(),
-			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod)),
 		},
 		{
 			name:             "call with missing method and identifier",
 			success:          true,
 			req:              common.NewRequest().SetID("fake_id"),
-			expectedResponse: common.NewResponse("fake_id").SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+			expectedResponse: common.NewResponse("fake_id").SetError(InvalidRequestError(validator.ErrMissingMethod)),
 		},
 		{
 			name:             "call with missing method and invalid identifier",
 			success:          true,
 			req:              common.NewRequest().SetID(false),
-			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidIdentifierType.Error())),
+			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidIdentifierType)),
 		},
 	}
 
@@ -287,7 +287,7 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 				common.NewRequest().SetID("fake_id").SetMethod("unknown"),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
+				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
 				common.NewResponse("fake_id").SetResult("foo"),
 			},
 		},
@@ -316,7 +316,7 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{1}),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService.Error())),
+				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
 				common.NewResponse("sleep_fast").SetResult("slept well"),
 				common.NewResponse("sleep_medium").SetResult("slept well"),
 				common.NewResponse("sleep_long").SetResult("slept well"),
@@ -340,7 +340,7 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 				common.NewRequest().SetID(0),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod)),
 			},
 		},
 		{
@@ -353,7 +353,7 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 				common.NewRequest().SetID("fake_id_args").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", -1}),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod.Error())),
+				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod)),
 				common.NewResponse("fake_id_args").SetResult(map[string]interface{}{
 					"str": "foo",
 					"num": float64(-1),

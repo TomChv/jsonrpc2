@@ -53,26 +53,26 @@ func (s *JsonRPC2) Register(namespace string, service interface{}) error {
 // Implement HTTP interface to listen and response to incoming HTTP request
 func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := validator.HTTPRequest(r); err != nil {
-		_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+		_ = common.NewResponse(nil).SetError(InvalidRequestError(err)).Send(w)
 		return
 	}
 
 	isBatch, err := validator.IsBatchRequest(r)
 	if err != nil {
-		_ = common.NewResponse(nil).SetError(ParsingError(err.Error())).Send(w)
+		_ = common.NewResponse(nil).SetError(ParsingError(err)).Send(w)
 		return
 	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		_ = common.NewResponse(nil).SetError(ParsingError(err.Error())).Send(w)
+		_ = common.NewResponse(nil).SetError(ParsingError(err)).Send(w)
 		return
 	}
 
 	if !isBatch {
 		req, err := parser.Request(body)
 		if err != nil {
-			res := common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+			res := common.NewResponse(nil).SetError(InvalidRequestError(err))
 			if req != nil && req.ID != nil {
 				res.SetID(req.ID)
 			}
@@ -91,9 +91,9 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reqs, err := parser.Batch(body)
 	if err != nil {
 		if errors.Is(err, parser.ErrEmptyBatch) {
-			_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+			_ = common.NewResponse(nil).SetError(InvalidRequestError(err)).Send(w)
 		} else {
-			_ = common.NewResponse(nil).SetError(ParsingError(err.Error())).Send(w)
+			_ = common.NewResponse(nil).SetError(ParsingError(err)).Send(w)
 		}
 		return
 	}
@@ -114,19 +114,19 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 			err := json.Unmarshal(rawR, &req)
 			if err != nil {
-				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+				r = common.NewResponse(nil).SetError(InvalidRequestError(err))
 				batchRes.Append(r)
 				return
 			}
 
 			if req.JsonRpc == "" {
-				r = common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion.Error()))
+				r = common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion))
 				batchRes.Append(r)
 				return
 			}
 
 			if err := validator.JsonRPCRequest(&req); err != nil {
-				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+				r = common.NewResponse(nil).SetError(InvalidRequestError(err))
 				if req.ID != nil {
 					r.SetID(req.ID)
 				}

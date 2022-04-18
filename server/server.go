@@ -113,7 +113,7 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 
 			req := common.Request{}
-			r := &common.Response{}
+			var r *common.Response
 
 			err := json.Unmarshal(rawR, &req)
 			if err != nil {

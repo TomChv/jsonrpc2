@@ -18,7 +18,7 @@ func Batch(body []byte) ([][]byte, error) {
 		return nil, ErrEmptyBatch
 	}
 
-	var res [][]byte
+	res := [][]byte{}
 	for _, req := range reqs {
 		d, err := json.Marshal(req)
 		if err != nil {

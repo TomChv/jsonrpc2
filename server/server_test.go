@@ -399,6 +399,199 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 	}
 }
 
+type officialExample struct{}
+type officialNotificationExample struct{}
+type officialGetExample struct{}
+
+func (o officialExample) PositionalSubtract(a, b int) (interface{}, error) {
+	return a - b, nil
+}
+
+func (o officialExample) NamedSubtract(arg struct {
+	Minuend    int `json:"minuend"`
+	Subtrahend int `json:"subtrahend"`
+}) (interface{}, error) {
+	return arg.Minuend - arg.Subtrahend, nil
+}
+
+func (o officialExample) Update(args []int) (interface{}, error) {
+	return args, nil
+}
+
+func (o officialExample) Sum(args []int) (int, error) {
+	res := 0
+	for _, arg := range args {
+		res += arg
+	}
+	return res, nil
+}
+
+func (o officialNotificationExample) Hello(arg int) (int, error) {
+	return arg, nil
+}
+
+func (o officialGetExample) Data() ([]interface{}, error) {
+	return []interface{}{"hello", 5}, nil
+}
+
+func TestJsonRPC2_ServeHTTP_Official_Example(t *testing.T) {
+	s := New(context.TODO())
+	err := s.Register("", &officialExample{})
+	assert.Equal(t, nil, err)
+	err = s.Register("notify", &officialNotificationExample{})
+	assert.Equal(t, nil, err)
+	err = s.Register("get", &officialGetExample{})
+	assert.Equal(t, nil, err)
+
+	testCases := []struct {
+		name             string
+		success          bool
+		batch            bool
+		req              []byte
+		expectedResponse []byte
+	}{
+		{
+			name:             "RPC call with positional parameters - subtract",
+			success:          true,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "positionalSubtract", "params": [42, 23], "id": 1}`),
+			expectedResponse: []byte(`{"jsonrpc":"2.0","result":19,"id":1}`),
+		},
+		{
+			name:             "RPC call with positional parameters - reverse subtract",
+			success:          true,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "positionalSubtract", "params": [23, 42], "id": 2}`),
+			expectedResponse: []byte(`{"jsonrpc":"2.0","result":-19,"id":2}`),
+		},
+		{
+			name:             "RPC call with named parameters - subtract",
+			success:          true,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "namedSubtract", "params": {"subtrahend": 23, "minuend": 42}, "id": 3}`),
+			expectedResponse: []byte(`{"jsonrpc":"2.0","result":19,"id":3}`),
+		},
+		{
+			name:             "RPC call with named parameters - reverse subtract",
+			success:          true,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "namedSubtract", "params": {"minuend": 42, "subtrahend": 23}, "id": 4}`),
+			expectedResponse: []byte(`{"jsonrpc":"2.0","result":19,"id":4}`),
+		},
+		{
+			name:             "RPC call notification - update",
+			success:          true,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "update", "params": [1,2,3,4,5]}`),
+			expectedResponse: nil,
+		},
+		{
+			name:             "RPC call notification  of non-existent method - foobar",
+			success:          true,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "foobar"}`),
+			expectedResponse: nil,
+		},
+		{
+			name:             "RPC call of non-existent method - foobar",
+			success:          false,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "foobar", "id": "1"}`),
+			expectedResponse: []byte(`{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": "1"}`),
+		},
+		{
+			name:             "RPC call of invalid JSON - foobar",
+			success:          false,
+			req:              []byte(`{"jsonrpc": "2.0", "method": "foobar, "params": "bar", "baz]`),
+			expectedResponse: []byte(`{"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": null}`),
+		},
+		{
+			name:             "RPC call with invalid Request Object",
+			success:          false,
+			req:              []byte(`{"jsonrpc": "2.0", "method": 1, "params": "bar"}`),
+			expectedResponse: []byte(`{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null}`),
+		},
+		{
+			name:             "RPC call Batch - invalid JSON",
+			success:          false,
+			req:              []byte(`[{"jsonrpc": "2.0", "method": "sum", "params": [1,2,4], "id": "1"},{"jsonrpc": "2.0", "method"]`),
+			expectedResponse: []byte(`{"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": null}`),
+		},
+		{
+			name:             "RPC call with an empty Array",
+			success:          false,
+			req:              []byte(`[]`),
+			expectedResponse: []byte(`{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null}`),
+		},
+		{
+			name:             "RPC call with an invalid Batch - one element",
+			success:          false,
+			req:              []byte(`[1]`),
+			expectedResponse: []byte(`[{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null}]`),
+			batch:            true,
+		},
+		{
+			name:             "RPC call with an invalid Batch - multi element",
+			success:          false,
+			req:              []byte(`[1,2,3]`),
+			expectedResponse: []byte(`[{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null},{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null},{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null}]`),
+			batch:            true,
+		},
+		{
+			name:             "RPC call Batch",
+			success:          false,
+			req:              []byte(`[{"jsonrpc": "2.0", "method": "sum", "params": [1,2,4], "id": "1"},{"jsonrpc": "2.0", "method": "notify_hello", "params": [7]},{"jsonrpc": "2.0", "method": "positionalSubtract", "params": [42,23], "id": "2"},{"foo": "boo"},{"jsonrpc": "2.0", "method": "foo.get", "params": {"name": "myself"}, "id": "5"},{"jsonrpc": "2.0", "method": "get_data", "id": "9"}]`),
+			expectedResponse: []byte(`[{"jsonrpc": "2.0", "result": 7, "id": "1"},{"jsonrpc": "2.0", "result": 19, "id": "2"},{"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": null},{"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": "5"},{"jsonrpc": "2.0", "result": ["hello", 5], "id": "9"}]`),
+			batch:            true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(tt.req))
+			w := httptest.NewRecorder()
+
+			s.ServeHTTP(w, req)
+
+			res := w.Result()
+
+			defer res.Body.Close()
+
+			data, err := ioutil.ReadAll(res.Body)
+			if tt.expectedResponse == nil {
+				assert.Empty(t, data)
+				return
+			}
+
+			assert.Equal(t, nil, err)
+			if tt.success {
+				assert.Equal(t, string(tt.expectedResponse), string(data))
+				return
+			}
+
+			if !tt.batch {
+				var r common.Response
+				var expect common.Response
+
+				_ = json.Unmarshal(tt.expectedResponse, &expect)
+				_ = json.Unmarshal(data, &r)
+
+				assert.Equal(t, expect.ID, r.ID)
+				assert.Equal(t, expect.Error.Code, r.Error.Code)
+				assert.Equal(t, expect.Error.Message, r.Error.Message)
+			} else {
+				var res []common.Response
+				var expects []common.Response
+
+				_ = json.Unmarshal(tt.expectedResponse, &expects)
+				_ = json.Unmarshal(data, &res)
+
+				// Ignore data
+				for _, r := range res {
+					if r.Error != nil {
+						r.Error.Data = nil
+					}
+				}
+
+				assert.ElementsMatch(t, expects, res)
+			}
+		})
+	}
+}
+
 func TestJsonRPC2_Run(t *testing.T) {
 	//	ctx, cancel := context.WithCancel(context.TODO())
 	//

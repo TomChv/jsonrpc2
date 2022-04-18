@@ -98,13 +98,10 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := []*Response{}
+	batchRes := &common.Batch{}
 
 	// Handle concurrency
-	var (
-		wg sync.WaitGroup
-		l  sync.Mutex
-	)
+	var wg sync.WaitGroup
 
 	for _, rawReq := range reqs {
 		wg.Add(1)
@@ -118,31 +115,35 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			err := json.Unmarshal(rawR, &req)
 			if err != nil {
 				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
-			} else if req.JsonRpc == "" {
-				r = common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion))
-			} else {
-				if err := validator.JsonRPCRequest(&req); err != nil {
-					r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
-					if req.ID != nil {
-						r.SetID(req.ID)
-					}
-				} else {
-					r = s.handle(&req)
-				}
-
-				if r.ID == nil {
-					return
-				}
+				batchRes.Append(r)
+				return
 			}
 
-			l.Lock()
-			defer l.Unlock()
-			res = append(res, r)
+			if req.JsonRpc == "" {
+				r = common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion.Error()))
+				batchRes.Append(r)
+				return
+			}
+
+			if err := validator.JsonRPCRequest(&req); err != nil {
+				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+				if req.ID != nil {
+					r.SetID(req.ID)
+				}
+			} else {
+				r = s.handle(&req)
+			}
+
+			if r.ID == nil {
+				return
+			}
+
+			batchRes.Append(r)
 		}(rawReq)
 	}
 
 	wg.Wait()
-	_ = s.sendBatch(res, w)
+	_ = batchRes.Send(w)
 }
 
 // Run start JSON RPC 2.0 server

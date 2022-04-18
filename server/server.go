@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -88,7 +90,11 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	reqs, err := parser.Batch(body)
 	if err != nil {
-		_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+		if errors.Is(err, parser.ErrEmptyBatch) {
+			_ = common.NewResponse(nil).SetError(InvalidRequestError(err.Error())).Send(w)
+		} else {
+			_ = common.NewResponse(nil).SetError(ParsingError(err.Error())).Send(w)
+		}
 		return
 	}
 
@@ -100,31 +106,39 @@ func (s *JsonRPC2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		l  sync.Mutex
 	)
 
-	for _, req := range reqs {
-		req := req
+	for _, rawReq := range reqs {
 		wg.Add(1)
 
-		go func() {
+		go func(rawR []byte) {
 			defer wg.Done()
 
-			var r *common.Response
-			if err := validator.JsonRPCRequest(req); err != nil {
-				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
-				if req != nil && req.ID != nil {
-					r.SetID(req.ID)
-				}
-			} else {
-				r = s.handle(req)
-			}
+			req := common.Request{}
+			r := &common.Response{}
 
-			if r.ID == nil {
-				return
+			err := json.Unmarshal(rawR, &req)
+			if err != nil {
+				r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+			} else if req.JsonRpc == "" {
+				r = common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidJsonVersion))
+			} else {
+				if err := validator.JsonRPCRequest(&req); err != nil {
+					r = common.NewResponse(nil).SetError(InvalidRequestError(err.Error()))
+					if req.ID != nil {
+						r.SetID(req.ID)
+					}
+				} else {
+					r = s.handle(&req)
+				}
+
+				if r.ID == nil {
+					return
+				}
 			}
 
 			l.Lock()
 			defer l.Unlock()
 			res = append(res, r)
-		}()
+		}(rawReq)
 	}
 
 	wg.Wait()

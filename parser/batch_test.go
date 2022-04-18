@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/TomChv/jsonrpc2/common"
@@ -18,9 +19,9 @@ func TestBatch(t *testing.T) {
 		{
 			name:           "Empty array",
 			body:           []byte(`[]`),
-			success:        true,
-			expectedResult: []*common.Request{},
-			expectedError:  nil,
+			success:        false,
+			expectedResult: nil,
+			expectedError:  ErrEmptyBatch,
 		},
 		{
 			name:           "Simple request [Only Method]",
@@ -89,10 +90,25 @@ func TestBatch(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			res, err := Batch(tt.body)
+			RawRes, err := Batch(tt.body)
+			assert.Equal(t, tt.expectedError, err)
+
+			if tt.expectedResult == nil {
+				assert.Nil(t, RawRes)
+				return
+			}
+
+			res := []*common.Request{}
+			for _, rawR := range RawRes {
+				var r *common.Request
+
+				if err := json.Unmarshal(rawR, &r); err != nil {
+					assert.Fail(t, err.Error())
+				}
+				res = append(res, r)
+			}
 
 			assert.Equal(t, tt.expectedResult, res)
-			assert.Equal(t, tt.expectedError, err)
 		})
 	}
 }

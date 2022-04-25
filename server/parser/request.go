@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/TomChv/jsonrpc2/common"
-	"github.com/TomChv/jsonrpc2/validator"
+	"github.com/TomChv/jsonrpc2/server/validator"
 )
 
 var (

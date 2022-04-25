@@ -25,9 +25,9 @@ func JsonRPCRequest(req *common.Request) error {
 				return ErrInvalidIdentifierType
 			}
 			// nolint:forcetypeassert
-			req.SetID(int(req.ID.(float64)))
+			req.ID = int(req.ID.(float64))
 		default:
-			req.SetID(nil)
+			req.ID = nil
 			return ErrInvalidIdentifierType
 		}
 	}

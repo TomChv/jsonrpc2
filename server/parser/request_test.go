@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/TomChv/jsonrpc2/common"
-	"github.com/TomChv/jsonrpc2/validator"
+	"github.com/TomChv/jsonrpc2/server/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,7 +54,7 @@ func TestRequest(t *testing.T) {
 			name:           "Only method",
 			body:           []byte(`{"jsonrpc": "2.0", "method": "/test"}`),
 			success:        true,
-			expectedResult: common.NewRequest().SetMethod("/test"),
+			expectedResult: &common.Request{JsonRpc: "2.0", Method: "/test"},
 			expectedError:  nil,
 		},
 
@@ -62,71 +62,81 @@ func TestRequest(t *testing.T) {
 			name:           "String identifier",
 			body:           []byte(`{"jsonrpc": "2.0", "method": "/test", "id": "fake_id"}`),
 			success:        true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetID("fake_id"),
+			expectedResult: &common.Request{JsonRpc: "2.0", Method: "/test", ID: "fake_id"},
 			expectedError:  nil,
 		},
 		{
 			name:           "Number identifier",
 			body:           []byte(`{"jsonrpc": "2.0", "method": "/test", "id": 4}`),
 			success:        true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetID(4),
+			expectedResult: &common.Request{JsonRpc: "2.0", Method: "/test", ID: 4},
 			expectedError:  nil,
 		},
 		{
 			name:           "Null identifier",
 			body:           []byte(`{"jsonrpc": "2.0", "method": "/test", "id": null}`),
 			success:        true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetID(nil),
+			expectedResult: &common.Request{JsonRpc: "2.0", Method: "/test", ID: nil},
 			expectedError:  nil,
 		},
 		{
 			name:           "With param string",
 			body:           []byte(`{"jsonrpc": "2.0", "method": "/test", "params": "test"}`),
 			success:        true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetParams("test"),
+			expectedResult: &common.Request{JsonRpc: "2.0", Method: "/test", Params: "test"},
 			expectedError:  nil,
 		},
 		{
 			name:           "With param number",
 			body:           []byte(`{"jsonrpc": "2.0", "method": "/test", "params": 4}`),
 			success:        true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetParams(float64(4)),
+			expectedResult: &common.Request{JsonRpc: "2.0", Method: "/test", Params: float64(4)},
 			expectedError:  nil,
 		},
 		{
 			name:    "With param struct",
 			body:    []byte(`{"jsonrpc": "2.0", "method": "/test", "params": {"foo": "bar", "baz": 4 }}`),
 			success: true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetParams(map[string]interface{}{
-				"foo": "bar",
-				"baz": float64(4),
-			}),
+			expectedResult: &common.Request{
+				JsonRpc: "2.0",
+				Method:  "/test",
+				Params: map[string]interface{}{
+					"foo": "bar",
+					"baz": float64(4),
+				}},
 			expectedError: nil,
 		},
 		{
 			name:    "Valid request : with param nested struct",
 			body:    []byte(`{"jsonrpc": "2.0", "method": "/test", "params": {"foo": "bar", "baz": 4, "fizz": { "bool": true }}}`),
 			success: true,
-			expectedResult: common.NewRequest().SetMethod("/test").SetParams(map[string]interface{}{
-				"foo": "bar",
-				"baz": float64(4),
-				"fizz": map[string]interface{}{
-					"bool": true,
-				},
-			}),
+			expectedResult: &common.Request{
+				JsonRpc: "2.0",
+				Method:  "/test",
+				Params: map[string]interface{}{
+					"foo": "bar",
+					"baz": float64(4),
+					"fizz": map[string]interface{}{
+						"bool": true,
+					},
+				}},
 			expectedError: nil,
 		},
 		{
 			name:    "Valid request : with param nested struct with identifier",
 			body:    []byte(`{"jsonrpc": "2.0", "method": "/test", "id": "fake_id", "params": {"foo": "bar", "baz": 4, "fizz": { "bool": true }}}`),
 			success: true,
-			expectedResult: common.NewRequest().SetID("fake_id").SetMethod("/test").SetParams(map[string]interface{}{
-				"foo": "bar",
-				"baz": float64(4),
-				"fizz": map[string]interface{}{
-					"bool": true,
-				},
-			}),
+			expectedResult: &common.Request{
+				JsonRpc: "2.0",
+				Method:  "/test",
+				ID:      "fake_id",
+				Params: map[string]interface{}{
+					"foo": "bar",
+					"baz": float64(4),
+					"fizz": map[string]interface{}{
+						"bool": true,
+					},
+				}},
 			expectedError: nil,
 		},
 	}

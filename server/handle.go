@@ -4,8 +4,7 @@ import (
 	"errors"
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
-	"github.com/TomChv/jsonrpc2/common"
-	"github.com/TomChv/jsonrpc2/parser"
+	"github.com/TomChv/jsonrpc2/server/parser"
 )
 
 var ErrNoFunctionErrorFound = errors.New("could not retrieve function error")
@@ -18,23 +17,23 @@ var ErrNoFunctionErrorFound = errors.New("could not retrieve function error")
 func (s *JsonRPC2) handle(req *Request) *Response {
 	p, err := parser.Method(req.Method)
 	if err != nil {
-		return common.NewResponse(req.ID).SetError(InvalidRequestError(err))
+		return NewResponse(req.ID).SetError(InvalidRequestError(err))
 	}
 
 	m, err := s.d.GetMethod(p.Service, p.Method)
 	if err != nil {
-		return common.NewResponse(req.ID).SetError(MethodNotFoundError(err))
+		return NewResponse(req.ID).SetError(MethodNotFoundError(err))
 	}
 
 	args, err := parser.Arguments(m.GetArgsTypes()[1:], req.Params)
 	if err != nil {
-		return common.NewResponse(req.ID).SetError(InvalidParamsError(err))
+		return NewResponse(req.ID).SetError(InvalidParamsError(err))
 	}
 
 	// Run procedure
 	ret, err := s.d.Run(p.Service, p.Method, args...)
 	if err != nil {
-		res := common.NewResponse(req.ID)
+		res := NewResponse(req.ID)
 
 		switch {
 		case errors.Is(err, dispatcher.ErrNonExistentMethod) ||
@@ -54,15 +53,15 @@ func (s *JsonRPC2) handle(req *Request) *Response {
 	if ret[1].Interface() != nil {
 		err, ok := ret[1].Interface().(error)
 		if !ok {
-			return common.NewResponse(req.ID).SetError(InternalError(ErrNoFunctionErrorFound))
+			return NewResponse(req.ID).SetError(InternalError(ErrNoFunctionErrorFound))
 		}
 
 		// Send error
 		if err != nil {
-			return common.NewResponse(req.ID).SetError(InternalError(err))
+			return NewResponse(req.ID).SetError(InternalError(err))
 		}
 	}
 
 	// Send response
-	return common.NewResponse(req.ID).SetResult(ret[0].Interface())
+	return NewResponse(req.ID).SetResult(ret[0].Interface())
 }

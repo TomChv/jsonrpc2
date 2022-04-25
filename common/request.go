@@ -1,7 +1,5 @@
 package common
 
-import "encoding/json"
-
 // RequestParam is a Structured value that holds the parameter values to be used
 // during the invocation of the method
 type RequestParam = interface{}
@@ -22,30 +20,4 @@ type Request struct {
 	// Number, or NULL value if included.
 	// If it is not included it is assumed to be a notification.
 	ID RequestID `json:"id,omitempty"`
-}
-
-func NewRequest() *Request {
-	return &Request{
-		JsonRpc: JSON_RPC_VERSION,
-	}
-}
-
-func (r *Request) SetID(id RequestID) *Request {
-	r.ID = id
-
-	return r
-}
-
-func (r *Request) SetMethod(method string) *Request {
-	r.Method = method
-	return r
-}
-
-func (r *Request) SetParams(params RequestParam) *Request {
-	r.Params = params
-	return r
-}
-
-func (r *Request) Bytes() ([]byte, error) {
-	return json.Marshal(r)
 }

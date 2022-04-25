@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/PtitLuca/go-dispatcher/dispatcher"
+	"github.com/TomChv/jsonrpc2/client"
 	"github.com/TomChv/jsonrpc2/common"
-	"github.com/TomChv/jsonrpc2/validator"
+	"github.com/TomChv/jsonrpc2/server/validator"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -125,38 +126,38 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 	testCases := []struct {
 		name             string
 		success          bool
-		req              *Request
+		req              *client.Request
 		expectedResponse *Response
 	}{
 		{
 			name:             "call MethodEmptyArgs",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
-			expectedResponse: common.NewResponse("fake_id").SetResult("foo"),
+			req:              client.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
+			expectedResponse: NewResponse("fake_id").SetResult("foo"),
 		},
 		{
 			name:             "call MethodWithArgString",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgString").SetParams([]string{"bar"}),
-			expectedResponse: common.NewResponse("fake_id").SetResult("bar"),
+			req:              client.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgString").SetParams([]string{"bar"}),
+			expectedResponse: NewResponse("fake_id").SetResult("bar"),
 		},
 		{
 			name:             "call MethodWithArgNumber",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgNumber").SetParams([]int{4}),
-			expectedResponse: common.NewResponse("fake_id").SetResult(float64(4)),
+			req:              client.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgNumber").SetParams([]int{4}),
+			expectedResponse: NewResponse("fake_id").SetResult(float64(4)),
 		},
 		{
 			name:             "call MethodWithArgFloat",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgFloat").SetParams([]float64{-2}),
-			expectedResponse: common.NewResponse("fake_id").SetResult(float64(-2)),
+			req:              client.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgFloat").SetParams([]float64{-2}),
+			expectedResponse: NewResponse("fake_id").SetResult(float64(-2)),
 		},
 		{
 			name:    "call MethodWithArgs",
 			success: true,
-			req:     common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", 25}),
-			expectedResponse: common.NewResponse("fake_id").SetResult(map[string]interface{}{
+			req:     client.NewRequest().SetID("fake_id").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", 25}),
+			expectedResponse: NewResponse("fake_id").SetResult(map[string]interface{}{
 				"str": "foo",
 				"num": float64(25),
 			}),
@@ -164,13 +165,13 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 		{
 			name:    "call MethodWithComplexArgs",
 			success: true,
-			req: common.NewRequest().SetID("fake_id").SetMethod("mock_methodWithComplexArgs").SetParams([]interface{}{
+			req: client.NewRequest().SetID("fake_id").SetMethod("mock_methodWithComplexArgs").SetParams([]interface{}{
 				[]string{"foo", "bar"},
 				25,
 				false,
 				FakeStruct{0, true, "fakeStruct"},
 			}),
-			expectedResponse: common.NewResponse("fake_id").SetResult(map[string]interface{}{
+			expectedResponse: NewResponse("fake_id").SetResult(map[string]interface{}{
 				"str":  []interface{}{"foo", "bar"},
 				"num":  float64(25),
 				"bool": false,
@@ -184,44 +185,44 @@ func TestJsonRPC2_ServeHTTP_Single(t *testing.T) {
 		{
 			name:             "call MethodEmptyArgs with int identifier",
 			success:          true,
-			req:              common.NewRequest().SetID(-1).SetMethod("mock_methodEmptyArgs"),
-			expectedResponse: common.NewResponse(float64(-1)).SetResult("foo"),
+			req:              client.NewRequest().SetID(-1).SetMethod("mock_methodEmptyArgs"),
+			expectedResponse: NewResponse(float64(-1)).SetResult("foo"),
 		},
 		{
 			name:             "call MethodEmptyArgs with notification",
 			success:          true,
-			req:              common.NewRequest().SetMethod("mock_methodEmptyArgs"),
+			req:              client.NewRequest().SetMethod("mock_methodEmptyArgs"),
 			expectedResponse: nil,
 		},
 		{
 			name:             "call MethodWithArgs",
 			success:          true,
-			req:              common.NewRequest().SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", 25}),
+			req:              client.NewRequest().SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", 25}),
 			expectedResponse: nil,
 		},
 		{
 			name:             "call unknown method",
 			success:          false,
-			req:              common.NewRequest().SetID("fake_id").SetMethod("unknown"),
-			expectedResponse: common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
+			req:              client.NewRequest().SetID("fake_id").SetMethod("unknown"),
+			expectedResponse: NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
 		},
 		{
 			name:             "call with empty body",
 			success:          false,
-			req:              common.NewRequest(),
-			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod)),
+			req:              client.NewRequest(),
+			expectedResponse: NewResponse(nil).SetError(InvalidRequestError(validator.ErrMissingMethod)),
 		},
 		{
 			name:             "call with missing method and identifier",
 			success:          true,
-			req:              common.NewRequest().SetID("fake_id"),
-			expectedResponse: common.NewResponse("fake_id").SetError(InvalidRequestError(validator.ErrMissingMethod)),
+			req:              client.NewRequest().SetID("fake_id"),
+			expectedResponse: NewResponse("fake_id").SetError(InvalidRequestError(validator.ErrMissingMethod)),
 		},
 		{
 			name:             "call with missing method and invalid identifier",
 			success:          true,
-			req:              common.NewRequest().SetID(false),
-			expectedResponse: common.NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidIdentifierType)),
+			req:              client.NewRequest().SetID(false),
+			expectedResponse: NewResponse(nil).SetError(InvalidRequestError(validator.ErrInvalidIdentifierType)),
 		},
 	}
 
@@ -263,103 +264,103 @@ func TestJsonRPC2_ServeHTTP_Batch(t *testing.T) {
 	testCases := []struct {
 		name              string
 		success           bool
-		reqs              []*Request
+		reqs              []*client.Request
 		expectedResponses []*Response
 		timeout           time.Duration
 	}{
 		{
 			name:              "Simple request [MethodEmptyArgs]",
 			success:           true,
-			reqs:              []*Request{common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs")},
-			expectedResponses: []*Response{common.NewResponse("fake_id").SetResult("foo")},
+			reqs:              []*client.Request{client.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs")},
+			expectedResponses: []*Response{NewResponse("fake_id").SetResult("foo")},
 		},
 		{
 			name:              "Simple request [Empty body]",
 			success:           true,
-			reqs:              []*Request{common.NewRequest()},
+			reqs:              []*client.Request{client.NewRequest()},
 			expectedResponses: nil,
 		},
 		{
 			name:    "Batch request [MethodEmptyArgs, Unknown Method]",
 			success: true,
-			reqs: []*Request{
-				common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
-				common.NewRequest().SetID("fake_id").SetMethod("unknown"),
+			reqs: []*client.Request{
+				client.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
+				client.NewRequest().SetID("fake_id").SetMethod("unknown"),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
-				common.NewResponse("fake_id").SetResult("foo"),
+				NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
+				NewResponse("fake_id").SetResult("foo"),
 			},
 		},
 		{
 			name:    "Batch request [MethodWithSleep, MethodWithSleep, MethodWithSleep] : test concurrency",
 			success: true,
-			reqs: []*Request{
-				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
-				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
-				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{2}),
+			reqs: []*client.Request{
+				client.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
+				client.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
+				client.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{2}),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse("sleep_fast").SetResult("slept well"),
-				common.NewResponse("sleep_medium").SetResult("slept well"),
-				common.NewResponse("sleep_long").SetResult("slept well"),
+				NewResponse("sleep_fast").SetResult("slept well"),
+				NewResponse("sleep_medium").SetResult("slept well"),
+				NewResponse("sleep_long").SetResult("slept well"),
 			},
 			timeout: time.Second * 7,
 		},
 		{
 			name:    "Batch request [Unknown Method, MethodWithSleep, MethodWithSleep, MethodWithSleep, Empty body]",
 			success: true,
-			reqs: []*Request{
-				common.NewRequest().SetID("fake_id").SetMethod("unknown"),
-				common.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
-				common.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
-				common.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{1}),
+			reqs: []*client.Request{
+				client.NewRequest().SetID("fake_id").SetMethod("unknown"),
+				client.NewRequest().SetID("sleep_medium").SetMethod("mock_methodWithSleep").SetParams([]int64{3}),
+				client.NewRequest().SetID("sleep_long").SetMethod("mock_methodWithSleep").SetParams([]int64{5}),
+				client.NewRequest().SetID("sleep_fast").SetMethod("mock_methodWithSleep").SetParams([]int64{1}),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
-				common.NewResponse("sleep_fast").SetResult("slept well"),
-				common.NewResponse("sleep_medium").SetResult("slept well"),
-				common.NewResponse("sleep_long").SetResult("slept well"),
+				NewResponse("fake_id").SetError(MethodNotFoundError(dispatcher.ErrNonExistentService)),
+				NewResponse("sleep_fast").SetResult("slept well"),
+				NewResponse("sleep_medium").SetResult("slept well"),
+				NewResponse("sleep_long").SetResult("slept well"),
 			},
 			timeout: time.Second * 7,
 		},
 		{
 			name:    "Simple request [Only Method, Invalid json rpc version]",
 			success: true,
-			reqs: []*Request{
-				common.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
+			reqs: []*client.Request{
+				client.NewRequest().SetID("fake_id").SetMethod("mock_methodEmptyArgs"),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse("fake_id").SetResult("foo"),
+				NewResponse("fake_id").SetResult("foo"),
 			},
 		},
 		{
 			name:    "Simple request [Invalid json rpc version, Missing method]",
 			success: true,
-			reqs: []*Request{
-				common.NewRequest().SetID(0),
+			reqs: []*client.Request{
+				client.NewRequest().SetID(0),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod)),
+				NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod)),
 			},
 		},
 		{
 			name:    "Simple request [MethodWithArgString, Missing method, String identifier, MethodWithArgs]",
 			success: true,
-			reqs: []*Request{
-				common.NewRequest().SetID(4).SetMethod("mock_methodWithArgString").SetParams([]string{"foo"}),
-				common.NewRequest().SetID(0),
-				common.NewRequest().SetID("fake_id_number").SetMethod("mock_methodWithArgNumber").SetParams([]int64{687}),
-				common.NewRequest().SetID("fake_id_args").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", -1}),
+			reqs: []*client.Request{
+				client.NewRequest().SetID(4).SetMethod("mock_methodWithArgString").SetParams([]string{"foo"}),
+				client.NewRequest().SetID(0),
+				client.NewRequest().SetID("fake_id_number").SetMethod("mock_methodWithArgNumber").SetParams([]int64{687}),
+				client.NewRequest().SetID("fake_id_args").SetMethod("mock_methodWithArgs").SetParams([]interface{}{"foo", -1}),
 			},
 			expectedResponses: []*Response{
-				common.NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod)),
-				common.NewResponse("fake_id_args").SetResult(map[string]interface{}{
+				NewResponse(float64(0)).SetError(InvalidRequestError(validator.ErrMissingMethod)),
+				NewResponse("fake_id_args").SetResult(map[string]interface{}{
 					"str": "foo",
 					"num": float64(-1),
 				}),
-				common.NewResponse(float64(4)).SetResult("foo"),
-				common.NewResponse("fake_id_number").SetResult(float64(687)),
+				NewResponse(float64(4)).SetResult("foo"),
+				NewResponse("fake_id_number").SetResult(float64(687)),
 			},
 		},
 	}

@@ -2,70 +2,88 @@ name: Continuous Integration
 
 on:
   push:
-    paths-ignore:
-      - .gitignore
-      - README.md
+    paths:
+      - "**.go"
+      - "**.cue"
+      - ".github/workflows/ci.yaml"
+      - "go.mod"
+      - "go.sum"
     branches:
       - main
   pull_request:
-    paths-ignore:
-      - .gitignore
-      - README.md
+    paths:
+      - "**.go"
+      - "**.cue"
+      - ".github/workflows/ci.yaml"
+      - "go.mod"
+      - "go.sum"
     branches:
       - main
 
+env:
+  DAGGER_LOG_FORMAT: plain
+
 jobs:
   unit-tests:
-    name: Unit tests
-    runs-on: ubuntu-20.04
+    name: "Unit tests"
+    runs-on: ubuntu-latest
+    env:
+      DAGGER_CACHE_BASE: "ci-test"
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Setup Golang
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
+      - name: "Expose GitHub Runtime"
+        uses: crazy-max/ghaction-github-runtime@v1
 
-      - name: Unit test
-        run: go test -v ./...
+      - name: "Set up dagger"
+        uses: dagger/dagger-for-github@v2
+        with:
+          install-only: true
+
+      - name: Sets env vars on push to main
+        run: |
+          echo "DAGGER_CACHE_TO=type=gha,mode=max,scope=${{env.DAGGER_CACHE_BASE}}-main" >> $GITHUB_ENV
+          echo "DAGGER_CACHE_FROM=type=gha,scope=${{env.DAGGER_CACHE_BASE}}-main" >> $GITHUB_ENV
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/head/main' }}
+
+      - name: Sets env vars on pull request
+        run: |
+          echo "DAGGER_CACHE_TO=type=gha,mode=max,scope=${{env.DAGGER_CACHE_BASE}}-${{github.event.number}}" >> $GITHUB_ENV
+          echo "DAGGER_CACHE_FROM=type=gha,scope=${{env.DAGGER_CACHE_BASE}}-main type=gha,scope=${{env.DAGGER_CACHE_BASE}}-${{github.event.number}}" >> $GITHUB_ENV
+        if: ${{ github.event_name == 'pull_request' }}
+
+      - name: Test
+        run: dagger do test
 
   lint:
-    name: Linter
-    runs-on: ubuntu-20.04
+    name: "Linter"
+    runs-on: ubuntu-latest
+    env:
+      DAGGER_CACHE_BASE: "ci-lint"
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Setup Golang
-        uses: actions/setup-go@v2
+      - name: "Expose GitHub Runtime"
+        uses: crazy-max/ghaction-github-runtime@v1
+
+      - name: "Set up dagger"
+        uses: dagger/dagger-for-github@v2
         with:
-          go-version: 1.17
+          install-only: true
+
+      - name: Sets env vars on push to main
+        run: |
+          echo "DAGGER_CACHE_TO=type=gha,mode=max,scope=${{env.DAGGER_CACHE_BASE}}-main" >> $GITHUB_ENV
+          echo "DAGGER_CACHE_FROM=type=gha,scope=${{env.DAGGER_CACHE_BASE}}-main" >> $GITHUB_ENV
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/head/main' }}
+
+      - name: Sets env vars on pull request
+        run: |
+          echo "DAGGER_CACHE_TO=type=gha,mode=max,scope=${{env.DAGGER_CACHE_BASE}}-${{github.event.number}}" >> $GITHUB_ENV
+          echo "DAGGER_CACHE_FROM=type=gha,scope=${{env.DAGGER_CACHE_BASE}}-main type=gha,scope=${{env.DAGGER_CACHE_BASE}}-${{github.event.number}}" >> $GITHUB_ENV
+        if: ${{ github.event_name == 'pull_request' }}
 
       - name: Run linter
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: latest
-          skip-go-installation: true
-          args:
-            --timeout=3m
-            -E whitespace
-            -E wastedassign
-            -E unconvert
-            -E tparallel
-            -E thelper
-            -E prealloc
-            -E predeclared
-            -E nolintlint
-            -E misspell
-            -E makezero
-            -E importas
-            -E ifshort
-            -E gosec
-            -E gofmt
-            -E goconst
-            -E forcetypeassert
-            -E dogsled
-            -E dupl
-            -E errname
-            -E errorlint
+        run: dagger do lint

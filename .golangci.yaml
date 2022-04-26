@@ -1,0 +1,22 @@
+linters:
+  enable:
+    - whitespace
+    - wastedassign
+    - unconvert
+    - tparallel
+    - thelper
+    - prealloc
+    - predeclared
+    - nolintlint
+    - misspell
+    - makezero
+    - importas
+    - ifshort
+    - gosec
+    - gofmt
+    - goconst
+    - forcetypeassert
+    - dogsled
+    - dupl
+    - errname
+    - errorlint

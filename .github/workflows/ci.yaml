@@ -37,7 +37,7 @@ jobs:
         uses: crazy-max/ghaction-github-runtime@v1
 
       - name: "Set up dagger"
-        uses: dagger/dagger-for-github@v2
+        uses: dagger/dagger-for-github@v3
         with:
           install-only: true
 
@@ -54,7 +54,7 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
 
       - name: Test
-        run: dagger do test
+        run: dagger project update && dagger do test
 
   lint:
     name: "Linter"
@@ -69,7 +69,7 @@ jobs:
         uses: crazy-max/ghaction-github-runtime@v1
 
       - name: "Set up dagger"
-        uses: dagger/dagger-for-github@v2
+        uses: dagger/dagger-for-github@v3
         with:
           install-only: true
 
@@ -86,4 +86,4 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
 
       - name: Run linter
-        run: dagger do lint
+        run: dagger project update && dagger do lint
